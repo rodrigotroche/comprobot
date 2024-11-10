@@ -11,7 +11,7 @@
         <div class="col-md-8">
             <form action="{{ route('frontend.search') }}" method="GET">
                 <div class="input-group mb-3">
-                    <input type="text" class="form-control" name="search" placeholder="Buscar productos" aria-label="Buscar productos" aria-describedby="button-addon2">
+                    <input type="text" class="form-control" name="search" placeholder="Buscar productos" autocomplete="off" aria-label="Buscar productos" aria-describedby="button-addon2">
                     <button class="btn btn-outline-secondary" type="submit" id="button-addon2">Buscar</button>
                 </div>
             </form>

@@ -7,6 +7,7 @@ use App\Models\PriceHistory;
 use App\Models\StoreUrl;
 use App\Models\Store;
 use App\Models\StoreProduct;
+use App\Models\TempProduct;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\DomCrawler\Crawler;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,25 +30,35 @@ class SyncSuperseisPrices implements ShouldQueue
     {
         try {
             ini_set('max_execution_time', 3600);
-            ini_set('memory_limit', '512M');
+            ini_set('memory_limit', '2048M');
 
             Log::info('Iniciando sincronización de Superseis');
 
             $store = Store::where('name', 'Superseis')->first();
+
+            // Verificar que haya pasado al menos 8 horas desde la última sincronización
+            if ($store->last_synced_at && $store->last_synced_at->diffInHours(now()) < 8) {
+                Log::info('Aún no han pasado 8 horas desde la última sincronización');
+                return;
+            }
 
             if (!$store) {
                 Log::error('No se encontró la tienda Superseis');
                 return;
             }
 
-            $urls = StoreUrl::where('store_id', $store->id)->where('enabled', true)->get();
+            $urls = StoreUrl::where('store_id', $store->id)
+                ->where('enabled', true)
+                ->where('status', 'pending')
+                ->where('type', 'product_list')
+                ->limit(2)
+                ->get();
 
             Log::info('Cantidad de URLs encontradas: ' . count($urls));
 
             foreach ($urls as $key => $storeUrl) {
                 if ($key > 0) {
                     Log::info('Esperando 5 segundos antes de continuar');
-                    sleep(5);
                 }
 
                 $client = HttpClient::create();
@@ -93,22 +104,24 @@ class SyncSuperseisPrices implements ShouldQueue
                     $imageName = basename($imageUrl);
                     Storage::disk('public')->put('images/' . $imageName, $imageContents);
 
-                    DB::beginTransaction();
-
-                    // Buscamos o creamos el producto general usando el SKU
-                    $sku = null; // Asume que obtienes el SKU en algún lugar o lo recibes
-                    $product = Product::where('sku', $sku)->firstOrCreate([
-                        'name' => $name,
-                        'description' => $name,
-                    ]);
-
-                    // Actualizamos o creamos el store_product utilizando el external_id
-                    $this->updateOrCreateStoreProduct($store, $product, $price, $productUrl, $imageName, $externalId, $sku);
-
-                    DB::commit();
+                    // Guardamos los productos en la tabla temporal `TempProduct`
+                    TempProduct::updateOrCreate(
+                        [
+                            'store_id' => $store->id,
+                            'reference_id' => $externalId,
+                        ],
+                        [
+                            'name' => $name,
+                            'url' => $productUrl,
+                            'image' => $imageName,
+                            'current_price' => $price,
+                            'status' => 'pending',
+                        ]
+                    );
                 });
 
                 $storeUrl->updated_at = now();
+                $storeUrl->status = 'processed';
                 $storeUrl->save();
             }
 
@@ -119,9 +132,6 @@ class SyncSuperseisPrices implements ShouldQueue
         }
     }
 
-    /**
-     * Método para extraer el ID del producto desde la URL.
-     */
     public function extractProductIdFromUrl(string $productUrl): ?int
     {
         if (preg_match('/products\/(\d+)-/', $productUrl, $matches)) {
@@ -129,62 +139,6 @@ class SyncSuperseisPrices implements ShouldQueue
         }
         return null;
     }
-
-    /**
-     * Método para guardar o actualizar un producto utilizando el ID extraído de la URL.
-     */
-    public function updateOrCreateProductById(int $productId, string $name): Product
-    {
-        return Product::updateOrCreate(
-            [
-                'external_id' => $productId,
-            ],
-            [
-                'name' => $name,
-                'description' => $name,
-            ]
-        );
-    }
-
-    public static function createHistory(Store $store, Product $product, string $formattedPrice): void
-    {
-        $today = now()->format('Y-m-d');
-        $existingHistory = PriceHistory::where('store_id', $store->id)
-            ->where('product_id', $product->id)
-            ->whereDate('created_at', $today)
-            ->first();
-
-        if ($existingHistory && $existingHistory->price == $formattedPrice) {
-            Log::info("El precio no ha cambiado para el producto {$product->id} en el día {$today}, no se crea un nuevo historial.");
-        } else {
-            $priceHistory = PriceHistory::create([
-                'store_id' => $store->id,
-                'product_id' => $product->id,
-                'price' => $formattedPrice,
-            ]);
-
-            Log::info('Historial de precios creado: ' . json_encode($priceHistory));
-        }
-    }
-
-    public function updateOrCreateStoreProduct(Store $store, Product $product, string $price, string $url, string $image, int $externalId, string $sku = null): void
-    {
-        StoreProduct::updateOrCreate(
-            [
-                'store_id' => $store->id,
-                'product_id' => $product->id,
-                'external_id' => $externalId,  // Usamos external_id para identificar el producto de la tienda
-            ],
-            [
-                'sku' => $sku,  // Aunque el sku sigue siendo relevante, lo manejamos en store_products
-                'price' => $price,
-                'url' => $url,
-                'image' => $image,
-                'previous_price' => null,  // Asume que manejarás esto como en tu código original
-            ]
-        );
-    }
-
 
     public static function formatPrice(string $price): string
     {

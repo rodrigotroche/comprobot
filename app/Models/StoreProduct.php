@@ -14,7 +14,7 @@ class StoreProduct extends Model
     protected $fillable = [
         'store_id',
         'product_id',
-        'external_id',
+        'reference_id',
         'sku',
         'url',
         'image',

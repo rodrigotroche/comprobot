@@ -14,7 +14,10 @@ class StoreUrl extends Model
     protected $fillable = [
         'store_id',
         'url',
+        'type',
         'enabled',
+        'last_synced_at',
+        'status',
     ];
 
     protected $casts = [
