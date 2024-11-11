@@ -78,7 +78,7 @@
 <div class="container py-5">
     <div class="row">
         <div class="col-md-12">
-            {{ $products->links('pagination::bootstrap-5') }}
+            {{ $products->withQueryString()->links('pagination::bootstrap-5') }}
         </div>
     </div>
 </div>
