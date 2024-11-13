@@ -31,7 +31,7 @@ class ProcessTempProducts implements ShouldQueue
 
         foreach ($tempProducts as $tempProduct) {
             if ($tempProduct->store->name === 'Superseis') {
-                SyncSuperseisProductDetail::dispatch($tempProduct)->delay(now()->addSeconds(5));
+                SyncSuperseisProductDetail::dispatch($tempProduct)->delay(now()->addSeconds(10));
             }
         }
     }

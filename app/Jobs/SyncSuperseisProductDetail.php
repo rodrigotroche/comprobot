@@ -86,8 +86,8 @@ class SyncSuperseisProductDetail implements ShouldQueue
                 $storeProduct = StoreProduct::updateOrCreate([
                     'store_id' => $this->tempProduct->store_id,
                     'product_id' => $product->id,
-                    'reference_id' => $this->tempProduct->reference_id,
                 ], [
+                    'reference_id' => $this->tempProduct->reference_id,
                     'sku' => $sku,
                     'url' => $this->tempProduct->url,
                     'image' => $this->tempProduct->image,

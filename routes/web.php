@@ -6,6 +6,7 @@ use App\Http\Controllers\MainController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShoppingListController;
 use App\Http\Controllers\ShoppingListItemController;
+use App\Http\Controllers\SuperseisController;
 
 Route::get('/', [MainController::class, 'index'])->name('frontend.index');
 Route::get('/s', [MainController::class, 'search'])->name('frontend.search');
@@ -31,5 +32,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+Route::get('/superseis/categories', [SuperseisController::class, 'getCategories'])->name('superseis.categories');
 
 require __DIR__ . '/auth.php';
